@@ -6,6 +6,10 @@ library(tidyr)
 library(stringr)
 library(feather)
 
+# Data of drafts downloaded
+from <- 2000
+to <- 2020
+
 read_html_cache <- function(url, cache.dir = 'cache') {
   fn <- tail(strsplit(url, '/')[[1]], 1)
   fn.path <- paste(cache.dir, fn, sep = '/')
@@ -74,7 +78,7 @@ parse_pfr_tables <- function(tables) {
 
 if (!file.exists('data/drafts.feather')) {
   
-draft.table <- data_frame(year = 2000:2015) %>%
+draft.table <- data_frame(year = from:to) %>%
   group_by(year) %>% do({
     url <- paste('http://www.pro-football-reference.com/years/', .$year, '/draft.htm', sep ='')
     doc <- read_html(url)
@@ -98,7 +102,7 @@ write_feather(draft.table, 'data/drafts.feather')
 
 if (!file.exists('data/combines.feather')) {
   
-combine.table <- data_frame(year = 2000:2016) %>%
+combine.table <- data_frame(year = from:to) %>%
   group_by(year) %>% do({
     url <- paste('http://www.pro-football-reference.com/draft/', .$year, '-combine.htm', sep ='')
     html.table <- read_html(url) %>%
@@ -119,15 +123,19 @@ combine.table <- data_frame(year = 2000:2016) %>%
 write_feather(combine.table, 'data/combines.feather')
 }
 
+broken_urls <- c("https://www.sports-reference.com/cfb/players/brian-calhoun-2.html")
 all.urls <- combine.table %>%
+  filter(pos=="QB") %>%
   select(url) %>%
-  full_join(draft.table %>% select(url)) %>%
-  filter(!is.na(url))
+  full_join(draft.table %>% filter(pos=="QB") %>% select(url)) %>%
+  filter(!is.na(url)) %>%
+  filter(!url %in% broken_urls)
 
 college.stats <- all.urls %>%
   group_by(url) %>% do({
     #cat('URL = ', .$url, '\n')
-    doc <- read_html_cache(.$url)
+    doc <- read_html(.$url)
+    print(.$url)
     stats <- doc %>%
       html_nodes('table') %>%
       parse_pfr_tables
